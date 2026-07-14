@@ -143,6 +143,7 @@ async function fetchWithTimeout(url, options, timeoutMs) {
 // ==========================================
 app.all('/ProxyHandler', async (req, res) => {
     const rawAddress = req.query.address;
+    const requestedContentType = req.query.contentType;
 
     if (!rawAddress) {
         return res.status(400).json({error: 'Missing "address" query parameter'});
@@ -171,7 +172,7 @@ app.all('/ProxyHandler', async (req, res) => {
         const fetchOptions = {
             method: req.method,
             headers: {
-                'Content-Type': getContentType(targetUrl.pathname),
+                'Content-Type': requestedContentType || getContentType(targetUrl.pathname),
                 'User-Agent': 'signature.proxy.node',
                 // Деякі хмарні провайдери (напр. Вчасно) звіряють Origin/Referer
                 // зі своїм реєстром клієнтів — прокидаємо origin оригінального запиту.
