@@ -35,6 +35,7 @@ const knownHosts = new Set([
     "root-test.czo.gov.ua",
     "zc.bank.gov.ua",
     "cs.vchasno.ua",
+    "cihsm-api.oschadbank.ua"
 ]);
 
 function loadHostsFromFile(filePath) {
