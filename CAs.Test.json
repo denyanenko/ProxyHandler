@@ -1,0 +1,32 @@
+[
+  {
+    "issuerCNs": [
+      "Тестовий ЦСК",
+      "Test CA",
+      "Тестовий надавач електронних довірчих послуг",
+      "Адміністратор ІТС ЦЗО (CA TEST)",
+      "Administrator ITS CCA (CA TEST)"
+    ],
+    "address": "ca-test.czo.gov.ua",
+    "ocspAccessPointAddress": "ca-test.czo.gov.ua/services/ocsp/",
+    "ocspAccessPointPort": "80",
+    "cmpAddress": "ca-test.czo.gov.ua",
+    "tspAddress": "ca-test.czo.gov.ua",
+    "tspAddressPort": "80",
+    "directAccess": true,
+    "codeEDRPOU": "43395033",
+    "qscdSNInCert": true
+  },
+  {
+    "issuerCNs": [
+      "Тестовий ЦСК АТ \"ІІТ\""
+    ],
+    "address": "ca.iit.com.ua",
+    "ocspAccessPointAddress": "ca.iit.com.ua/services/ocsp/",
+    "ocspAccessPointPort": "80",
+    "cmpAddress": "ca.iit.com.ua",
+    "tspAddress": "ca.iit.com.ua",
+    "tspAddressPort": "80",
+    "directAccess": true
+  }
+]
