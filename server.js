@@ -35,7 +35,12 @@ const knownHosts = new Set([
     "root-test.czo.gov.ua",
     "zc.bank.gov.ua",
     "cs.vchasno.ua",
-    "cihsm-api.oschadbank.ua"
+    "cihsm-api.oschadbank.ua",
+    "cihsm-api.gp.gov.ua",
+    "cihsm-api.bankalliance.ua",
+    "apiext.pumb.ua",
+    "vtms-api-qca.ukrgasbank.com"
+
 ]);
 
 function loadHostsFromFile(filePath) {
@@ -105,6 +110,8 @@ function safeParseURL(address) {
 const CONTENT_TYPE_RULES = [
     {test: /\/cloud\/api\/back\//, type: 'application/json'},
     {test: /\/ss\//, type: 'application/json'},
+    {test: /\/iit-signer\/api\/v1\//, type: 'application/json'},
+    {test: /\/(acquire-operation-id|check-operation-status)/, type: 'application/json'},
     {test: /\/(services\/cmp|public\/x509\/cmp|cmp)\b/, type: ''},
     {
         test: /\/(services\/ocsp|public\/ocsp|ocsp(-rsa|-ecdsa)?|OCSPsrv\/ocsp|queries\/ocsp)\b/,
