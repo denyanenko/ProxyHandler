@@ -8,7 +8,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ==========================================
-// 🛠 НАЛАШТУВАННЯ СЕРВЕРА
+// НАЛАШТУВАННЯ СЕРВЕРА
 // ==========================================
 const ENABLE_TEST_MODE = process.env.ENABLE_TEST_MODE !== 'false'; // за замовчуванням true, вимикається через env
 const REQUEST_TIMEOUT_MS = 15000;
@@ -29,10 +29,9 @@ app.use(cors({
 app.use(express.text({type: '*/*', limit: '10mb'}));
 
 // ==========================================
-// 🛡️ БІЛИЙ СПИСОК ХОСТІВ (куди дозволено ходити проксі)
+// БІЛИЙ СПИСОК ХОСТІВ (куди дозволено ходити проксі)
 // ==========================================
-const knownHosts = new Set([
-    "root-test.czo.gov.ua",
+const PROD_HOSTS = [
     "zc.bank.gov.ua",
     "cs.vchasno.ua",
     "cihsm-api.oschadbank.ua",
@@ -40,13 +39,18 @@ const knownHosts = new Set([
     "cihsm-api.bankalliance.ua",
     "apiext.pumb.ua",
     "vtms-api-qca.ukrgasbank.com"
+];
 
-]);
+const TEST_HOSTS = [
+    "root-test.czo.gov.ua"
+];
 
-function loadHostsFromFile(filePath) {
+const allowedHosts = new Set();
+
+function loadHostsFromFile(filePath, targetSet ) {
     try {
         if (!fs.existsSync(filePath)) {
-            console.warn(`⚠️  Файл ${filePath} не знайдено, пропускаю.`);
+            console.warn(`Файл ${filePath} не знайдено, пропускаю.`);
             return;
         }
 
@@ -61,35 +65,37 @@ function loadHostsFromFile(filePath) {
                 if (!ca[field]) return;
                 // Домен може прийти як "host.com" або "host.com/path" — беремо тільки хост
                 const domain = String(ca[field]).split('/')[0].trim();
-                if (domain && !knownHosts.has(domain)) {
-                    knownHosts.add(domain);
+                if (domain && !targetSet.has(domain)) {
+                    targetSet.add(domain);
                     addedCount++;
                 }
             });
         });
 
-        console.log(`✅ ${filePath}: додано ${addedCount} нових доменів.`);
+        console.log(`${filePath}: додано ${addedCount} нових доменів.`);
     } catch (error) {
-        console.error(`❌ Помилка читання ${filePath}:`, error.message);
+        console.error(`Помилка читання ${filePath}:`, error.message);
     }
 }
 
 function initializeAllowedHosts() {
-    console.log("🔄 Завантаження конфігурацій АЦСК...");
-    loadHostsFromFile('./CAs.json');
+    console.log("Завантаження конфігурацій АЦСК...");
+    PROD_HOSTS.forEach(host => allowedHosts.add(host));
+    loadHostsFromFile('./CAs.json', allowedHosts);
 
     if (ENABLE_TEST_MODE) {
-        console.log("🧪 ТЕСТОВИЙ режим увімкнено. Завантажую тестові АЦСК...");
-        loadHostsFromFile('./CAs.Test.json');
+        console.log("ТЕСТОВИЙ режим увімкнено. Завантажую тестові АЦСК...");
+        TEST_HOSTS.forEach(host => allowedHosts.add(host));
+        loadHostsFromFile('./CAs.Test.json', allowedHosts);
     }
 
-    console.log(`🛡️  Білий список сформовано: ${knownHosts.size} унікальних доменів.\n`);
+    console.log(`Білий список сформовано: ${allowedHosts.size} унікальних доменів.\n`);
 }
 
 initializeAllowedHosts();
 
 // ==========================================
-// 🔧 ДОПОМІЖНІ ФУНКЦІЇ
+// ДОПОМІЖНІ ФУНКЦІЇ
 // ==========================================
 
 /**
@@ -139,7 +145,7 @@ async function fetchWithTimeout(url, options, timeoutMs) {
 }
 
 // ==========================================
-// 🚏 ГОЛОВНИЙ ОБРОБНИК ПРОКСІ
+//  ГОЛОВНИЙ ОБРОБНИК ПРОКСІ
 // ==========================================
 app.all('/ProxyHandler', async (req, res) => {
     const rawAddress = req.query.address;
@@ -156,12 +162,12 @@ app.all('/ProxyHandler', async (req, res) => {
 
     // Дозволяємо ходити тільки по HTTPS (захист від протокольного даунгрейду)
     if (targetUrl.protocol !== 'http:' && targetUrl.protocol !== 'https:') {
-        console.warn(`⚠️  БЛОКУВАННЯ (недопустимий протокол): ${targetUrl.href}`);
+        console.warn(`БЛОКУВАННЯ (недопустимий протокол): ${targetUrl.href}`);
         return res.status(403).json({ error: 'Only http:// and https:// targets are allowed' });
     }
 
-    if (!knownHosts.has(targetUrl.hostname)) {
-        console.warn(`⚠️  БЛОКУВАННЯ: хост "${targetUrl.hostname}" не в білому списку. Повний URL: ${targetUrl.href}`);
+    if (!allowedHosts.has(targetUrl.hostname)) {
+        console.warn(`БЛОКУВАННЯ: хост "${targetUrl.hostname}" не в білому списку. Повний URL: ${targetUrl.href}`);
         return res.status(403).json({error: `Host ${targetUrl.hostname} not in whitelist`});
     }
 
@@ -192,19 +198,19 @@ app.all('/ProxyHandler', async (req, res) => {
         // Ручна обробка редиректу: дозволяємо перехід тільки на інший хост із того ж білого списку
         if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
             const redirectUrl = safeParseURL(response.headers.get('location'));
-            if (redirectUrl && knownHosts.has(redirectUrl.hostname)) {
-                console.warn(`↪️  Редирект дозволено: ${targetUrl.hostname} → ${redirectUrl.hostname}`);
+            if (redirectUrl && allowedHosts.has(redirectUrl.hostname)) {
+                console.warn(`Редирект дозволено: ${targetUrl.hostname} → ${redirectUrl.hostname}`);
                 // Проста рекурсія в межах одного редиректу; за потреби можна зробити лічильник глибини.
                 req.query.address = redirectUrl.href;
                 return app._router.handle(req, res);
             }
-            console.warn(`⚠️  БЛОКУВАННЯ редиректу на хост поза білим списком: ${response.headers.get('location')}`);
+            console.warn(`БЛОКУВАННЯ редиректу на хост поза білим списком: ${response.headers.get('location')}`);
             return res.status(502).json({error: 'Upstream redirected outside of whitelist'});
         }
 
         if (!response.ok) {
             const details = await response.text().catch(() => '');
-            console.warn(`⚠️  Upstream ${response.status} від ${targetUrl.hostname}: ${details.slice(0, 300)}`);
+            console.warn(`Upstream ${response.status} від ${targetUrl.hostname}: ${details.slice(0, 300)}`);
             return res.status(response.status).json({
                 error: `Upstream error ${response.status}`,
                 details: details.slice(0, 2000),
@@ -222,7 +228,7 @@ app.all('/ProxyHandler', async (req, res) => {
 
     } catch (error) {
         if (error.name === 'AbortError') {
-            console.error(`⏱️  Таймаут запиту до ${targetUrl.hostname} (>${REQUEST_TIMEOUT_MS}мс)`);
+            console.error(`Таймаут запиту до ${targetUrl.hostname} (>${REQUEST_TIMEOUT_MS}мс)`);
             return res.status(504).json({error: 'Upstream request timed out'});
         }
         console.error('Proxy Error:', error.message);
@@ -231,9 +237,9 @@ app.all('/ProxyHandler', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-    console.log(`🚀 Крипто-проксі працює на http://localhost:${PORT}`);
-    console.log(`🔗 Ендпоінт для бібліотеки: http://localhost:${PORT}/ProxyHandler`);
+    console.log(`Крипто-проксі працює на http://localhost:${PORT}`);
+    console.log(`Ендпоінт для бібліотеки: http://localhost:${PORT}/ProxyHandler`);
     if (ALLOWED_ORIGINS.length === 0) {
-        console.warn('⚠️  ALLOWED_ORIGINS не задано — proxy приймає запити з БУДЬ-ЯКОГО сайту. Задайте ALLOWED_ORIGINS для production.');
+        console.warn('ALLOWED_ORIGINS не задано — proxy приймає запити з БУДЬ-ЯКОГО сайту. Задайте ALLOWED_ORIGINS для production.');
     }
 });
